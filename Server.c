@@ -14,6 +14,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#define MAX 5
 	#define DEFAULT_PORT 12345    /* the port users will be connecting to */
 
 	#define BACKLOG 10     /* how many pending connections queue will hold */
@@ -22,6 +23,52 @@
 	struct sockaddr_in my_addr;    /* my address information */
 	struct sockaddr_in their_addr; /* connector's address information */
 	socklen_t sin_size;
+
+int channel_id[MAX]; // ID=0 Available, 1 = Not available/subbed
+
+void func(int sockfd) 
+{ 
+	int buff[MAX]; 
+	int input_id = 0;
+	
+	int status = 0;
+	
+	
+		bzero(buff, MAX); 
+
+		// read the message from client and copy it in buffer 
+		read(sockfd, buff, sizeof(buff)); 
+		// print buffer which contains the client contents 
+		
+			printf("Client request channel %d\n", buff[0]); 
+			
+		
+
+		buff[0] = input_id;
+		channel_id[input_id] = 1;
+		
+		if (channel_id[input_id] == 1){
+			buff[0] = 1;
+		}
+		if (channel_id[input_id] == 0){
+			buff[0] = 0;
+			channel_id[input_id] = 1;
+		}
+		
+
+		bzero(buff, MAX); 
+		
+		// copy server message in the buffer 
+		//buff[0] = 1;
+
+		// and send that buffer to client 
+		write(sockfd, buff, sizeof(buff)); 
+	
+	 
+} 
+
+
+
 
 void shutdown_server(int sig){
 	close(sockfd);
@@ -74,6 +121,7 @@ int main(int argc, char *argv[])
 	}
 
 	printf("Server starts listening on port %d...\n", port);
+	
 
 	/* repeat: accept, send, close the connection */
 	/* for every accepted connection, use a sepetate process or thread to serve it */
@@ -88,15 +136,21 @@ int main(int argc, char *argv[])
 		printf("server: got connection from %s\n", \
 			inet_ntoa(their_addr.sin_addr));
 
+		
 
 		if (!fork()) { /* this is the child process */
 			if (send(new_fd, "Welcome! Your client ID is \n", 28, 0) == -1)
 				perror("send");
+				func(new_fd);
 			close(new_fd);
 			exit(0);
 		}
+		
+		
 		close(new_fd);  /* parent doesn't need this */
-
+		
 		while(waitpid(-1,NULL,WNOHANG) > 0); /* clean up child processes */
+		
 	}
+	
 }

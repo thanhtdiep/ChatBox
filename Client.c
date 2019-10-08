@@ -7,10 +7,44 @@
 #include <netinet/in.h> 
 #include <sys/socket.h> 
 #include <unistd.h>
+#define MAX 255
+
 
 	#define PORT 12345    /* the port client will be connecting to */
-
 	#define MAXDATASIZE 100 /* max number of bytes we can get at once */
+
+
+int input;
+
+void subscribe(int sockfd){
+
+	int buff[MAX]; 
+	
+	for (;;) { 
+	bzero(buff, sizeof(buff)); 
+	printf("From Client:\n\tEnter channel to subscribe : "); 
+	scanf("%d", &input);
+	buff[0] = input;
+	
+	write(sockfd, buff, sizeof(buff)); 
+	bzero(buff, sizeof(buff)); 
+	read(sockfd, buff, sizeof(buff)); 
+	printf("From Server : %d\n", buff[0]); 
+	
+	}
+
+
+}
+
+void unsubscribe(){
+
+}
+
+
+
+
+
+
 
 int main(int argc, char *argv[])
 {
@@ -55,8 +89,9 @@ int main(int argc, char *argv[])
 	}
 
 	buf[numbytes] = '\0';
-
+	
 	printf("Received: %s",buf);
+	subscribe(sockfd);
 
 	close(sockfd);
 
