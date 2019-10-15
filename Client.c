@@ -9,8 +9,30 @@
 #include <unistd.h>
 
 	#define PORT 12345    /* the port client will be connecting to */
-
+	#define MAX 1000 
 	#define MAXDATASIZE 100 /* max number of bytes we can get at once */
+
+void loop_listen(int new_fd)
+{
+	char buff[MAX];
+	int n;
+	/* repeat: accept, send, close the connection */
+	/* for every accepted connection, use a sepetate process or thread to serve it */
+	while (1)
+	{ /* main accept() loop */
+		bzero(buff, sizeof(buff));
+		n=0;
+		while ((buff[n++] = getchar()) != '\n') 
+            ; 
+        write(new_fd, buff, sizeof(buff)); 
+		printf("%s",buff);
+		if ((strncmp(buff, "bye", 3)) == 0) { 
+            printf("Client Exit...\n"); 
+			/*	Unscribes all channels*/
+            break; 
+        }
+	}
+}
 
 int main(int argc, char *argv[])
 {
@@ -57,6 +79,8 @@ int main(int argc, char *argv[])
 	buf[numbytes] = '\0';
 
 	printf("Received: %s",buf);
+	
+	loop_listen(sockfd);
 
 	close(sockfd);
 
