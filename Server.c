@@ -14,7 +14,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define MAX 5
+#define MAX 255
 	#define DEFAULT_PORT 12345    /* the port users will be connecting to */
 
 	#define BACKLOG 10     /* how many pending connections queue will hold */
@@ -24,50 +24,96 @@
 	struct sockaddr_in their_addr; /* connector's address information */
 	socklen_t sin_size;
 
-int channel_id[MAX]; // ID=0 Available, 1 = Not available/subbed
+int channel_id[254]; // ID=0 Available, 1 = Not available/subbed
 
-void func(int sockfd) 
+
+void subscribe(int sockfd) 
 { 
-	int buff[MAX]; 
+	
 	int input_id = 0;
+	int32_t tmp;
 	
-	int status = 0;
-	
-	
-		bzero(buff, MAX); 
+		bzero(&tmp, sizeof(tmp)); 
 
 		// read the message from client and copy it in buffer 
-		read(sockfd, buff, sizeof(buff)); 
+		read(sockfd, &tmp, sizeof(tmp)); 
 		// print buffer which contains the client contents 
 		
-			printf("Client request channel %d\n", buff[0]); 
+		printf("Client request channel %d\n", (int) tmp); 
+		
+		input_id = (int) tmp;
+		bzero(&tmp, sizeof(tmp)); 
+
+		if (input_id > 0 && input_id < 255 ){
 			
-		
+			if (channel_id[input_id] == 0){
+				//printf("Subscribe to channel %d\n", input_id);
+				bzero(&tmp, sizeof(tmp));
+				tmp  = 0;
+				write(sockfd, &tmp, sizeof(tmp)); 
+				channel_id[input_id] = input_id;
+			}
+			else{
+				bzero(&tmp, sizeof(tmp));
+				tmp  = 1;
+				write(sockfd, &tmp, sizeof(tmp)); 
+				//printf("Channel already subscribed\n");
+			}
 
-		buff[0] = input_id;
-		channel_id[input_id] = 1;
-		
-		if (channel_id[input_id] == 1){
-			buff[0] = 1;
 		}
-		if (channel_id[input_id] == 0){
-			buff[0] = 0;
-			channel_id[input_id] = 1;
+		else{
+			bzero(&tmp, sizeof(tmp));
+			tmp  = 2;
+			write(sockfd, &tmp, sizeof(tmp)); 
+			//printf("Channel range 0 to 255 only\n");
 		}
-		
 
-		bzero(buff, MAX); 
-		
-		// copy server message in the buffer 
-		//buff[0] = 1;
-
-		// and send that buffer to client 
-		write(sockfd, buff, sizeof(buff)); 
-	
-	 
 } 
 
 
+void unsubscribe(int sockfd) 
+{ 
+	
+	int input_id = 0;
+	int32_t tmp;
+	
+		bzero(&tmp, sizeof(tmp)); 
+
+		// read the message from client and copy it in buffer 
+		read(sockfd, &tmp, sizeof(tmp)); 
+		// print buffer which contains the client contents 
+		
+		printf("Client request unsubscribe %d\n", (int) tmp); 
+		
+		input_id = (int) tmp;
+		bzero(&tmp, sizeof(tmp));
+		//channel_id[5] = 0; 
+
+		if (input_id > 0 && input_id < 255 ){
+			
+			if (channel_id[input_id] == input_id){
+				//printf("unsubscribe to channel %d\n", input_id);
+				bzero(&tmp, sizeof(tmp));
+				tmp  = 0;
+				write(sockfd, &tmp, sizeof(tmp)); 
+				channel_id[input_id] = 0;
+			}
+			else{
+				bzero(&tmp, sizeof(tmp));
+				tmp  = 1;
+				write(sockfd, &tmp, sizeof(tmp)); 
+				//printf("Channel already unsubscribed\n");
+			}
+
+		}
+		else{
+			bzero(&tmp, sizeof(tmp));
+			tmp  = 2;
+			write(sockfd, &tmp, sizeof(tmp)); 
+			//printf("Channel range 0 to 255 only\n");
+		}
+
+} 
 
 
 void shutdown_server(int sig){
@@ -141,7 +187,7 @@ int main(int argc, char *argv[])
 		if (!fork()) { /* this is the child process */
 			if (send(new_fd, "Welcome! Your client ID is \n", 28, 0) == -1)
 				perror("send");
-				func(new_fd);
+			subscribe(new_fd);
 			close(new_fd);
 			exit(0);
 		}
@@ -150,7 +196,9 @@ int main(int argc, char *argv[])
 		close(new_fd);  /* parent doesn't need this */
 		
 		while(waitpid(-1,NULL,WNOHANG) > 0); /* clean up child processes */
-		
 	}
 	
+	
+	
+
 }

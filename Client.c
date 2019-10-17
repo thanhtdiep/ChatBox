@@ -7,7 +7,7 @@
 #include <netinet/in.h> 
 #include <sys/socket.h> 
 #include <unistd.h>
-#define MAX 255
+#define MAX 1
 
 
 	#define PORT 12345    /* the port client will be connecting to */
@@ -18,29 +18,70 @@ int input;
 
 void subscribe(int sockfd){
 
-	int buff[MAX]; 
-	
-	for (;;) { 
-	bzero(buff, sizeof(buff)); 
-	printf("From Client:\n\tEnter channel to subscribe : "); 
+	int32_t tmp;
+	int status;
+
+	bzero(&tmp, sizeof(tmp)); 
+	printf("Enter channel to subscribe : "); 
 	scanf("%d", &input);
-	buff[0] = input;
+
+	tmp  = input;
+
+	write(sockfd, &tmp, sizeof(tmp)); 
+	bzero(&tmp, sizeof(tmp));
 	
-	write(sockfd, buff, sizeof(buff)); 
-	bzero(buff, sizeof(buff)); 
-	read(sockfd, buff, sizeof(buff)); 
-	printf("From Server : %d\n", buff[0]); 
+	read(sockfd, &tmp, sizeof(tmp)); 
+	status = (int) tmp;
 	
+	if (status == 0){
+		printf("Subscribed to channel %d\n", input);
+		
+	}
+	else if (status == 1){
+		printf("Channel already subscribed\n");
+	}
+	else if (status == 2){
+		printf("Channel range 0 to 255 only\n");
+	}
+	else{
+
+	}
+	
+	
+}
+
+void unsubscribe(int sockfd){
+
+	int32_t tmp;
+	int status;
+
+	bzero(&tmp, sizeof(tmp)); 
+	printf("Enter channel to unsubscribe : "); 
+	scanf("%d", &input);
+
+	tmp  = input;
+
+	write(sockfd, &tmp, sizeof(tmp)); 
+	bzero(&tmp, sizeof(tmp));
+	
+	read(sockfd, &tmp, sizeof(tmp)); 
+	status = (int) tmp;
+	
+	if (status == 0){
+		printf("Unsubscribed to channel %d\n", input);
+		
+	}
+	else if (status == 1){
+		printf("Channel not subscribed\n");
+	}
+	else if (status == 2){
+		printf("Channel range 0 to 255 only\n");
+	}
+	else{
+
 	}
 
-
 }
-
-void unsubscribe(){
-
-}
-
-
 
 
 
