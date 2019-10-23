@@ -1,16 +1,19 @@
-#include <stdio.h> 
-#include <stdlib.h> 
-#include <errno.h> 
-#include <string.h> 
-#include <netdb.h> 
-#include <sys/types.h> 
-#include <netinet/in.h> 
-#include <sys/socket.h> 
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <string.h>
+#include <netdb.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
-	#define PORT 12345    /* the port client will be connecting to */
-	#define MAX 1000 
-	#define MAXDATASIZE 100 /* max number of bytes we can get at once */
+#define PORT 12345 /* the port client will be connecting to */
+#define MAX 1000
+#define MAXDATASIZE 100 /* max number of bytes we can get at once */
+int input;
+void send_message(int sockfd, char *channel, char message[]);
+void subscribe();
 
 void loop_listen(int new_fd)
 {
@@ -21,65 +24,202 @@ void loop_listen(int new_fd)
 	while (1)
 	{ /* main accept() loop */
 		bzero(buff, sizeof(buff));
-		n=0;
-		while ((buff[n++] = getchar()) != '\n') 
-            ; 
-        write(new_fd, buff, sizeof(buff)); 
-		printf("%s",buff);
-		if ((strncmp(buff, "bye", 3)) == 0) { 
-            printf("Client Exit...\n"); 
+		n = 0;
+		while ((buff[n++] = getchar()) != '\n')
+			;
+		write(new_fd, buff, sizeof(buff));
+		printf("%s", buff);
+
+		if ((strncmp(buff, "SUB", 3)) == 0)
+		{
+			printf("SUB process\n");
 			/*	Unscribes all channels*/
-            break; 
-        }
+			// Clean buffer
+			bzero(buff, sizeof(buff));
+
+			// Send selected commnand to server
+			subscribe(new_fd);
+
+			break;
+		}
+
+		if ((strncmp(buff, "SEND", 4)) == 0)
+		{
+			int i = 0;
+			n = 0;
+			char message[MAX];
+			char *channel = (char *)malloc(3);
+			// Send SEND signal to server
+
+			strncpy(channel, buff + 5, 3);
+			printf("%d\n", atoi(channel));
+			//	Filter message
+			for (i = 0; i < sizeof(buff); i++)
+			{
+				message[i] = buff[9 + i];
+			}
+			printf("%s\n", message);
+
+			// Run send commands
+			send_message(new_fd, channel, message);
+		}
+
+		if ((strncmp(buff, "TEST", 4)) == 0){
+			printf("Testing");
+		}
+
+		if ((strncmp(buff, "BYE", 3)) == 0)
+		{
+			printf("Client Exit...\n");
+			/*	Unscribes all channels*/
+			break;
+		}
+	}
+}
+
+void send_message(int sockfd, char *channel, char message[])
+{
+	// CLean buffer
+	int32_t tmp = 0;
+	int status;
+	// printf("%d\n", tmp);
+	// bzero(&tmp, sizeof(tmp));
+	// Send request channel to server
+	tmp =  atoi(channel);
+	printf("%d\n", tmp);
+	write(sockfd, &tmp, sizeof(tmp));
+	// If request channel is valid, send message
+
+	// If not, let print error message
+
+}
+
+void subscribe(int sockfd)
+{
+	int32_t tmp;
+	int status;
+
+	bzero(&tmp, sizeof(tmp));
+	printf("Enter channel to subscribe : ");
+	scanf("%d", &input);
+
+	tmp = input;
+
+	write(sockfd, &tmp, sizeof(tmp));
+	bzero(&tmp, sizeof(tmp));
+
+	read(sockfd, &tmp, sizeof(tmp));
+	status = (int)tmp;
+
+	if (status == 0)
+	{
+		printf("Subscribed to channel %d\n", input);
+	}
+	else if (status == 1)
+	{
+		printf("Channel already subscribed\n");
+	}
+	else if (status == 2)
+	{
+		printf("Channel range 0 to 255 only\n");
+	}
+	else
+	{
+	}
+}
+
+void unsubscribe(int sockfd)
+{
+
+	int32_t tmp;
+	int status;
+
+	bzero(&tmp, sizeof(tmp));
+	printf("Enter channel to unsubscribe : ");
+	scanf("%d", &input);
+
+	tmp = input;
+
+	write(sockfd, &tmp, sizeof(tmp));
+	bzero(&tmp, sizeof(tmp));
+
+	read(sockfd, &tmp, sizeof(tmp));
+	status = (int)tmp;
+
+	if (status == 0)
+	{
+		printf("Unsubscribed to channel %d\n", input);
+	}
+	else if (status == 1)
+	{
+		printf("Channel not subscribed\n");
+	}
+	else if (status == 2)
+	{
+		printf("Channel range 0 to 255 only\n");
+	}
+	else
+	{
 	}
 }
 
 int main(int argc, char *argv[])
 {
-	int sockfd, numbytes, port;  
+	int sockfd, numbytes, port;
 	char buf[MAXDATASIZE];
 	struct hostent *he;
 	struct sockaddr_in their_addr; /* connector's address information */
 
-	if (argc < 2) {
-		fprintf(stderr,"usage: client hostname (or zPAddress [portNumber])\n");
+	if (argc < 2)
+	{
+		fprintf(stderr, "usage: client hostname (or zPAddress [portNumber])\n");
 		exit(1);
 	}
-	
-	if (argc > 2){
-		port = atoi(argv[2]);
-	} else port = PORT;
 
-	if ((he=gethostbyname(argv[1])) == NULL) {  /* get the host info */
+	if (argc > 2)
+	{
+		port = atoi(argv[2]);
+	}
+	else
+		port = PORT;
+
+	if ((he = gethostbyname(argv[1])) == NULL)
+	{ /* get the host info */
 		herror("gethostbyname");
 		exit(1);
 	}
 
-	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+	{
 		perror("socket");
 		exit(1);
 	}
 
-	their_addr.sin_family = AF_INET;      /* host byte order */
-	their_addr.sin_port = htons(port);    /* short, network byte order */
+	their_addr.sin_family = AF_INET;   /* host byte order */
+	their_addr.sin_port = htons(port); /* short, network byte order */
 	their_addr.sin_addr = *((struct in_addr *)he->h_addr);
-	bzero(&(their_addr.sin_zero), 8);     /* zero the rest of the struct */
+	bzero(&(their_addr.sin_zero), 8); /* zero the rest of the struct */
 
-	if (connect(sockfd, (struct sockaddr *)&their_addr, \
-	sizeof(struct sockaddr)) == -1) {
+	if (connect(sockfd, (struct sockaddr *)&their_addr,
+				sizeof(struct sockaddr)) == -1)
+	{
 		perror("connect");
 		exit(1);
 	}
 
-	if ((numbytes=recv(sockfd, buf, MAXDATASIZE, 0)) == -1) {
+	if ((numbytes = recv(sockfd, buf, MAXDATASIZE, 0)) == -1)
+	{
 		perror("recv");
 		exit(1);
 	}
 
 	buf[numbytes] = '\0';
 
-	printf("Received: %s",buf);
-	
+	// 	Welcome message for new client
+	printf("Welcome! Your client ID is %s.\n", buf);
+	printf("A number of available commands:\n");
+	printf("1. SUB <channelid>\t2. CHANNELS\n3. UNSUB <channelid>\t4. NEXT <channelid>\n5. LIVEFEED <channelid>\t6. NEXT\n7. SEND <channelid> <message>\t8. BYE\n");
+	printf("Enter command: ");
 	loop_listen(sockfd);
 
 	close(sockfd);

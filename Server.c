@@ -22,20 +22,125 @@ int sockfd, new_fd, port;	  /* listen on sock_fd, new connection on new_fd */
 struct sockaddr_in my_addr;	/* my address information */
 struct sockaddr_in their_addr; /* connector's address information */
 socklen_t sin_size;
+int channel_id[254]={0}; // ID=0 Available, 1 = Not available/subbed
+int32_t client_id; // new connection +1
+char inbox[1000][254];
 
 void shutdown_server(int sig)
 {
 	while (waitpid(-1, NULL, WNOHANG) > 0); /* clean up child processes */
 	close(new_fd); /* parent doesn't need this */
 	close(sockfd);
-	printf("Exit gracefully through SIGNINT");
 	exit(0);
 }
 
-void loop_listen(int new_fd, int clientID)
+void subscribe(int sockfd) 
+{ 
+	
+	int input_id = 0;
+	int32_t tmp;
+	
+		bzero(&tmp, sizeof(tmp)); 
+
+		// read the message from client and copy it in buffer 
+		read(sockfd, &tmp, sizeof(tmp)); 
+		// print buffer which contains the client contents 
+		printf("Client request channel %d\n", (int) tmp); 
+		
+		input_id = (int) tmp;
+		bzero(&tmp, sizeof(tmp)); 
+
+		if (input_id > 0 && input_id < 255 ){
+			
+			if (channel_id[input_id] == 0){
+				//printf("Subscribe to channel %d\n", input_id);
+				bzero(&tmp, sizeof(tmp));
+				tmp  = 0;
+				write(sockfd, &tmp, sizeof(tmp)); 
+				channel_id[input_id] = input_id;
+			}
+			else{
+				bzero(&tmp, sizeof(tmp));
+				tmp  = 1;
+				write(sockfd, &tmp, sizeof(tmp)); 
+				//printf("Channel already subscribed\n");
+			}
+
+
+		}
+		else{
+			bzero(&tmp, sizeof(tmp));
+			tmp  = 2;
+			write(sockfd, &tmp, sizeof(tmp)); 
+			//printf("Channel range 0 to 255 only\n");
+		}
+
+} 
+
+void unsubscribe(int sockfd) 
+{ 
+	
+	int input_id = 0;
+	int32_t tmp;
+	
+		bzero(&tmp, sizeof(tmp)); 
+
+		// read the message from client and copy it in buffer 
+		read(sockfd, &tmp, sizeof(tmp)); 
+		// print buffer which contains the client contents 
+		
+		printf("Client request unsubscribe %d\n", (int) tmp); 
+		
+		input_id = (int) tmp;
+		bzero(&tmp, sizeof(tmp));
+		//channel_id[5] = 0; 
+
+		if (input_id > 0 && input_id < 255 ){
+			
+			if (channel_id[input_id] == input_id){
+				//printf("unsubscribe to channel %d\n", input_id);
+				bzero(&tmp, sizeof(tmp));
+				tmp  = 0;
+				write(sockfd, &tmp, sizeof(tmp)); 
+				channel_id[input_id] = 0;
+			}
+			else{
+				bzero(&tmp, sizeof(tmp));
+				tmp  = 1;
+				write(sockfd, &tmp, sizeof(tmp)); 
+				//printf("Channel already unsubscribed\n");
+			}
+
+		}
+		else{
+			bzero(&tmp, sizeof(tmp));
+			tmp  = 2;
+			write(sockfd, &tmp, sizeof(tmp)); 
+			//printf("Channel range 0 to 255 only\n");
+		}
+
+} 
+
+
+void store_message(int sockfd){
+	int input_id = 0;
+	int32_t tmp = 0;
+	
+		bzero(&tmp, sizeof(tmp));
+		// read the message from client and copy it in buffer 
+		read(sockfd, &tmp, sizeof(tmp)); 
+		printf("%d\n", (int) tmp);
+		// Validating the channelid with the client
+		for (int i =0; i < sizeof(channel_id); i++){
+			
+		}
+
+}
+
+void loop_listen(int new_fd)
 {
-	char buff[MAX];
-	int n;
+	char buff[MAX] = {0};
+	int n ,ch;
 	/* repeat: accept, send, close the connection */
 	/* for every accepted connection, use a sepetate process or thread to serve it */
 	while (1)
@@ -44,32 +149,43 @@ void loop_listen(int new_fd, int clientID)
 		if ((new_fd = accept(sockfd, (struct sockaddr *)&their_addr,
 							 &sin_size)) == -1)
 		{
-			perror("accept");
+			perror("Accepting message");
 			continue;
 		}
 
 		printf("server: got connection from %s\n",
 			   inet_ntoa(their_addr.sin_addr));
-		// if (!fork()) { /* this is the child process */
-		// 	if (send(new_fd, "Welcome! Your client ID is \n", 28, 0) == -1)
-		// 		perror("send");
-		// 	close(new_fd);
-		// 	exit(0);
-		// }
-
-		write(new_fd, "Welcome! Your client ID is [CLIENTID]\n", 80);
-
+		// // if (!fork()) { /* this is the child process */
+		// // 	if (send(new_fd, "Welcome! Your client ID is \n", 28, 0) == -1)
+		// // 		perror("send");
+		// 		continue;
+		// // }	
+		send(new_fd, "1", 1, 0);
+		bzero(buff, sizeof(buff));
 		// read the message from client and copy it in buffer 
-        read(sockfd, buff, sizeof(buff));
+        read(new_fd, buff, sizeof(buff));
+		printf("%s", buff);
+
+		// Actions
+		if ((strncmp(buff, "SUB", 3)) == 0)
+		{
+			printf("SUB process\n");
+			subscribe(new_fd);
+			break;
+		}
+
+		// SEND command
+		if ((strncmp(buff, "SEND", 4)) == 0){
+			printf("SEND process\n");
+			store_message(new_fd);
+		}
+
+
 	}
 }
 
 int main(int argc, char *argv[])
 {
-	// Variables
-	int clientID = 0;
-	char welcomeMessage[] = "";
-
 	signal(SIGINT, shutdown_server); /* Let program exit when ctrl + c is pressed */
 
 	//	Check port number if not given use default port 12345
@@ -115,8 +231,9 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
+
 	printf("Server starts listening on port %d...\n", port);
 
 	// main loop once found a connection
-	loop_listen(new_fd, clientID);
+	loop_listen(new_fd);
 }
