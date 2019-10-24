@@ -61,6 +61,7 @@ void loop_listen(int new_fd)
 
 			// Run send commands
 			send_message(new_fd, channel, message);
+			printf("Sent");
 		}
 
 		if ((strncmp(buff, "TEST", 4)) == 0)

@@ -27,6 +27,7 @@ struct sockaddr_in their_addr; /* connector's address information */
 socklen_t sin_size;
 int channel_id[254] = {0}; // ID=0 Available, 1 = Not available/subbed
 int32_t client_id;		   // new connection +1
+pid_t childpid;
 char inbox[1000][254];
 
 //--------------------------------------Queue--------------------------------------------------------------
@@ -216,8 +217,8 @@ void store_message(int sockfd)
 	read(sockfd, message, sizeof(message));
 	printf("Full message from Client: %s\n", message);
 	// Filter channel
-	strncpy(channel, message, 3); 
-	
+	strncpy(channel, message, 3);
+
 	//	Filter message
 	for (int i = 0; i < sizeof(message); i++)
 	{
@@ -252,33 +253,38 @@ void loop_listen(int new_fd)
 			perror("Accepting message");
 			continue;
 		}
-
 		printf("server: got connection from %s\n",
 			   inet_ntoa(their_addr.sin_addr));
-		// // if (!fork()) { /* this is the child process */
-		// // 	if (send(new_fd, "Welcome! Your client ID is \n", 28, 0) == -1)
-		// // 		perror("send");
-		// 		continue;
-		// // }
-		send(new_fd, "1", 1, 0);
-		bzero(buff, sizeof(buff));
-		// read the message from client and copy it in buffer
-		read(new_fd, buff, sizeof(buff));
-		printf("%s", buff);
+		if ((childpid = fork()) == 0)
+		{ /* this is the child process */
+			// Send Client ID to the client side
+			send(new_fd, "1", 1, 0);
+			while (1)
+			{
+				// read the message from client and copy it in buffer
+				read(new_fd, buff, sizeof(buff));
+				// Actions
+				if ((strncmp(buff, "SUB", 3)) == 0)
+				{
+					printf("SUB process\n");
+					subscribe(new_fd);
+					bzero(buff, sizeof(buff));					
+				}
 
-		// Actions
-		if ((strncmp(buff, "SUB", 3)) == 0)
-		{
-			printf("SUB process\n");
-			subscribe(new_fd);
-			break;
-		}
-
-		// SEND command
-		if ((strncmp(buff, "SEND", 4)) == 0)
-		{
-			printf("SEND process\n");
-			store_message(new_fd);
+				// SEND command
+				if ((strncmp(buff, "SEND", 4)) == 0)
+				{
+					printf("SEND process\n");
+					store_message(new_fd);
+					bzero(buff, sizeof(buff));
+				}
+				if ((strncmp(buff, "BYE", 3)) == 0)
+				{
+					printf("Disconnected with %s\n", inet_ntoa(their_addr.sin_addr));
+					// Unsubcribe with all subbed channels
+					bzero(buff, sizeof(buff));
+				}
+			}
 		}
 	}
 }
@@ -347,4 +353,5 @@ int main(int argc, char *argv[])
 
 	// main loop once found a connection
 	loop_listen(new_fd);
+	close(new_fd);
 }
