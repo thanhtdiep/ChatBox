@@ -13,10 +13,13 @@
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <limits.h>
 
 #define DEFAULT_PORT 12345 /* the port users will be connecting to */
 #define MAX 1000		   /* message length */
 #define BACKLOG 10		   /* how many pending connections queue will hold */
+#define CHANNEL_MAX 255	/* max number of channels */
+
 /* Golbal variables */
 int sockfd, new_fd, port;	  /* listen on sock_fd, new connection on new_fd */
 struct sockaddr_in my_addr;	/* my address information */
@@ -26,6 +29,85 @@ int channel_id[254] = {0}; // ID=0 Available, 1 = Not available/subbed
 int32_t client_id;		   // new connection +1
 char inbox[1000][254];
 
+//--------------------------------------Queue--------------------------------------------------------------
+typedef struct Queue
+{
+	int capacity, size, front, rear;
+	char **entries;
+} Queue;
+
+// Function to create queue with maxEntry
+Queue *createQueue(int maxEntry)
+{
+	Queue *Q;
+	Q = (Queue *)malloc(sizeof(Queue));
+	// Initialise properties
+	Q->entries = malloc(sizeof(char *) * maxEntry);
+	Q->size = 0;
+	Q->capacity = maxEntry;
+	Q->front = 0;
+	Q->rear = -1;
+	// return the pointer
+	return Q;
+}
+
+void dequeue(Queue *Q)
+{
+	if (Q->size == 0)
+	{
+		Q->size--;
+		Q->front++;
+		// As we fill entries in circular fashion
+		if (Q->front == Q->capacity)
+		{
+			Q->front = 0;
+		}
+		return;
+	}
+}
+
+char *front(Queue *Q)
+{
+	if (Q->size != 0)
+	{
+		// return the front entry
+		return Q->entries[Q->front];
+	}
+	return NULL;
+}
+
+void enqueue(Queue *Q, char *element)
+{
+	// if queue is full, we cannot push an element into it as there is no space
+	if (Q->size == Q->capacity)
+	{
+		printf("Inbox is full\n");
+	}
+	else
+	{
+		Q->size++;
+		Q->rear = Q->rear + 1;
+		// As we fill the queue in circular fashopm
+		if (Q->rear == Q->capacity)
+		{
+			Q->rear = 0;
+		}
+		// Insert the elements in its rear side
+		Q->entries[Q->rear] = (char *)malloc((sizeof element + 1) * sizeof(char));
+		strcpy(Q->entries[Q->rear], element);
+		printf("Saved message successfully\n");
+	}
+	return;
+}
+// -------------------------------------------End of Queue-----------------------------------------------
+//------------------------------------Client ID------------------------------------------------------------
+typedef struct
+{
+	int index;
+	Queue *Q;
+} CHANNEL_ID;
+CHANNEL_ID channels[CHANNEL_MAX];
+//------------------------------------End of Client ID-------------------------------------------------------
 void shutdown_server(int sig)
 {
 	while (waitpid(-1, NULL, WNOHANG) > 0)
@@ -37,7 +119,6 @@ void shutdown_server(int sig)
 
 void subscribe(int sockfd)
 {
-
 	int input_id = 0;
 	int32_t tmp;
 
@@ -129,14 +210,24 @@ void store_message(int sockfd)
 {
 	int32_t tmp = 0;
 	char message[MAX] = {0};
+	char *channel = (char *)malloc(3);
 	// bzero(&message, sizeof(message));
 	// read the message from client and copy it in buffer
 	read(sockfd, message, sizeof(message));
-	printf("Client1: %s\n", message);
-	// for (int i = 0; i < strlen(message); i++)
-	// {
-	// 	printf("Client2: %c\n", message[i]);
-	// }
+	printf("Full message from Client: %s\n", message);
+	// Filter channel
+	strncpy(channel, message, 3); 
+	
+	//	Filter message
+	for (int i = 0; i < sizeof(message); i++)
+	{
+		message[i] = message[4 + i];
+	}
+	printf("Channel: %d\n", atoi(channel));
+	printf("Message: %s\n", message);
+	// enqueue message to the inbox queue
+	enqueue(channels[atoi(channel)].Q, message);
+
 	// Validating the channelid with the client
 	// for (int i =0; i < sizeof(channel_id); i++){
 	// 	if (channel_id[i] == tmp && channel_id[i] == 1){
@@ -192,6 +283,16 @@ void loop_listen(int new_fd)
 	}
 }
 
+void generateChannels()
+{
+	for (int i = 0; i < CHANNEL_MAX; i++)
+	{
+		channels[i].index = i;
+		channels[i].Q = createQueue(50);
+	}
+	printf("System: All channels initialised\n");
+}
+
 int main(int argc, char *argv[])
 {
 	signal(SIGINT, shutdown_server); /* Let program exit when ctrl + c is pressed */
@@ -240,6 +341,9 @@ int main(int argc, char *argv[])
 	}
 
 	printf("Server starts listening on port %d...\n", port);
+
+	// Generate channels upon startup
+	generateChannels();
 
 	// main loop once found a connection
 	loop_listen(new_fd);

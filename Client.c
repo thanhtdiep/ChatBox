@@ -50,13 +50,12 @@ void loop_listen(int new_fd)
 			char message[MAX];
 			char *channel = (char *)malloc(3);
 			// Send SEND signal to server
-
 			strncpy(channel, buff + 5, 3);
 			printf("%d\n", atoi(channel));
 			//	Filter message
 			for (i = 0; i < sizeof(buff); i++)
 			{
-				message[i] = buff[9 + i];
+				message[i] = buff[5 + i];
 			}
 			printf("%s\n", message);
 
@@ -93,9 +92,8 @@ void send_message(int sockfd, char *channel, char message[])
 	{
 		// Send message to server
 		printf("%s\n", message);
-		if (strlen(message) > 1024)	printf("Warning: Maximum length of message is 1024. Only 1024 characters will be sent this time \n");
-		write(sockfd, message, 1024);
-
+		if (strlen(message) > 1024 + 4)	printf("Warning: Maximum length of message is 1024. Only 1024 characters will be sent this time \n");
+		write(sockfd, message, 1024 + 4);
 	}
 }
 
