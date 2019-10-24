@@ -64,7 +64,8 @@ void loop_listen(int new_fd)
 			send_message(new_fd, channel, message);
 		}
 
-		if ((strncmp(buff, "TEST", 4)) == 0){
+		if ((strncmp(buff, "TEST", 4)) == 0)
+		{
 			printf("Testing");
 		}
 
@@ -79,19 +80,23 @@ void loop_listen(int new_fd)
 
 void send_message(int sockfd, char *channel, char message[])
 {
-	// CLean buffer
+	// Clean buffer
 	int32_t tmp = 0;
 	int status;
-	// printf("%d\n", tmp);
-	// bzero(&tmp, sizeof(tmp));
-	// Send request channel to server
-	tmp =  atoi(channel);
-	printf("%d\n", tmp);
-	write(sockfd, &tmp, sizeof(tmp));
-	// If request channel is valid, send message
+	tmp = atoi(channel);
+	// Check if input is within the range of channel id
+	if (tmp < 0 || tmp > 255)
+	{
+		printf("Invalid channel: %d\n", atoi(channel));
+	}
+	else
+	{
+		// Send message to server
+		printf("%s\n", message);
+		if (strlen(message) > 1024)	printf("Warning: Maximum length of message is 1024. Only 1024 characters will be sent this time \n");
+		write(sockfd, message, 1024);
 
-	// If not, let print error message
-
+	}
 }
 
 void subscribe(int sockfd)
