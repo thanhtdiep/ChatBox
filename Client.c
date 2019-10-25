@@ -28,18 +28,14 @@ void loop_listen(int new_fd)
 		while ((buff[n++] = getchar()) != '\n')
 			;
 		write(new_fd, buff, sizeof(buff));
-		printf("%s", buff);
-
 		if ((strncmp(buff, "SUB", 3)) == 0)
 		{
 			printf("SUB process\n");
 			/*	Unscribes all channels*/
 			// Clean buffer
 			bzero(buff, sizeof(buff));
-
 			// Send selected commnand to server
 			subscribe(new_fd);
-
 			break;
 		}
 
@@ -57,11 +53,8 @@ void loop_listen(int new_fd)
 			{
 				message[i] = buff[5 + i];
 			}
-			printf("%s\n", message);
-
 			// Run send commands
 			send_message(new_fd, channel, message);
-			printf("Sent");
 		}
 
 		if ((strncmp(buff, "TEST", 4)) == 0)
@@ -71,7 +64,7 @@ void loop_listen(int new_fd)
 
 		if ((strncmp(buff, "BYE", 3)) == 0)
 		{
-			printf("Client Exit...\n");
+			printf("Client: Exiting...\n");
 			/*	Unscribes all channels*/
 			break;
 		}
@@ -170,7 +163,8 @@ void unsubscribe(int sockfd)
 int main(int argc, char *argv[])
 {
 	int sockfd, numbytes, port;
-	char buf[MAXDATASIZE];
+	// char buf[MAXDATASIZE];
+	int tmp,n;
 	struct hostent *he;
 	struct sockaddr_in their_addr; /* connector's address information */
 
@@ -211,16 +205,16 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	if ((numbytes = recv(sockfd, buf, MAXDATASIZE, 0)) == -1)
+	if ((numbytes = recv(sockfd, &tmp, sizeof(tmp), 0)) == -1)
 	{
 		perror("recv");
 		exit(1);
 	}
 
-	buf[numbytes] = '\0';
-
+	// buf[numbytes] = '\0';
+	n = ntohl(tmp);
 	// 	Welcome message for new client
-	printf("Welcome! Your client ID is %s.\n", buf);
+	printf("Welcome! Your client ID is %d.\n", n);
 	printf("A number of available commands:\n");
 	printf("1. SUB <channelid>\t2. CHANNELS\n3. UNSUB <channelid>\t4. NEXT <channelid>\n5. LIVEFEED <channelid>\t6. NEXT\n7. SEND <channelid> <message>\t8. BYE\n");
 	printf("Enter command: ");

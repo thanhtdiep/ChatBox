@@ -101,14 +101,41 @@ void enqueue(Queue *Q, char *element)
 	return;
 }
 // -------------------------------------------End of Queue-----------------------------------------------
-//------------------------------------Client ID------------------------------------------------------------
+//------------------------------------Channel ID------------------------------------------------------------
 typedef struct
 {
 	int index;
 	Queue *Q;
 } CHANNEL_ID;
 CHANNEL_ID channels[CHANNEL_MAX];
-//------------------------------------End of Client ID-------------------------------------------------------
+//------------------------------------End of Channel ID-------------------------------------------------------
+//------------------------------------Client ID-------------------------------------------------------------
+typedef struct 
+{
+	int ID;
+	int total;
+	int subChannel[CHANNEL_MAX];
+}CLIENT_ID;
+// Function to create client
+CLIENT_ID *createClient()
+{
+	CLIENT_ID *client;
+	client = (CLIENT_ID *)malloc(sizeof(CLIENT_ID));
+	// Initialise properties
+	client->ID = client_id;
+	client_id++;
+	client->subChannel;
+	client->total++;
+	// return the pointer
+	return client;
+}
+
+void disconnectClient(CLIENT_ID *client)
+{
+	client->total--;
+	// Thinking about ID
+}
+//------------------------------------End of Client ID------------------------------------------------------
 void shutdown_server(int sig)
 {
 	while (waitpid(-1, NULL, WNOHANG) > 0)
@@ -209,23 +236,18 @@ void unsubscribe(int sockfd)
 
 void store_message(int sockfd)
 {
-	int32_t tmp = 0;
 	char message[MAX] = {0};
 	char *channel = (char *)malloc(3);
 	// bzero(&message, sizeof(message));
 	// read the message from client and copy it in buffer
 	read(sockfd, message, sizeof(message));
-	printf("Full message from Client: %s\n", message);
 	// Filter channel
 	strncpy(channel, message, 3);
-
 	//	Filter message
 	for (int i = 0; i < sizeof(message); i++)
 	{
 		message[i] = message[4 + i];
 	}
-	printf("Channel: %d\n", atoi(channel));
-	printf("Message: %s\n", message);
 	// enqueue message to the inbox queue
 	enqueue(channels[atoi(channel)].Q, message);
 
@@ -255,10 +277,13 @@ void loop_listen(int new_fd)
 		}
 		printf("server: got connection from %s\n",
 			   inet_ntoa(their_addr.sin_addr));
+			   
+		CLIENT_ID *client = createClient();
+		int tmp = htonl(client->ID);
+		send(new_fd, &tmp, sizeof(tmp), 0);
 		if ((childpid = fork()) == 0)
 		{ /* this is the child process */
 			// Send Client ID to the client side
-			send(new_fd, "1", 1, 0);
 			while (1)
 			{
 				// read the message from client and copy it in buffer
