@@ -26,9 +26,9 @@ struct sockaddr_in my_addr;	/* my address information */
 struct sockaddr_in their_addr; /* connector's address information */
 socklen_t sin_size;
 int channel_id[254] = {0}; // ID=0 Available, 1 = Not available/subbed
-int32_t client_id;		   // new connection +1
 pid_t childpid;
 char inbox[1000][254];
+volatile int client_id, client_counter;
 
 //--------------------------------------Queue--------------------------------------------------------------
 typedef struct Queue
@@ -110,30 +110,77 @@ typedef struct
 CHANNEL_ID channels[CHANNEL_MAX];
 //------------------------------------End of Channel ID-------------------------------------------------------
 //------------------------------------Client ID-------------------------------------------------------------
-typedef struct 
+typedef struct
 {
 	int ID;
 	int total;
 	int subChannel[CHANNEL_MAX];
-}CLIENT_ID;
+} CLIENT_ID;
 // Function to create client
 CLIENT_ID *createClient()
 {
+	// // declare pointer for id and counter
+	// int *id, *counter;
+
+	// // Point to the global id and counter
+	// id = &client_id;
+	// counter = &client_counter;
+
 	CLIENT_ID *client;
 	client = (CLIENT_ID *)malloc(sizeof(CLIENT_ID));
-	// Initialise properties
+	// if next client_id smaller than total number
+	// if (client_id < client_counter - 1)
+	// {
+	// 	// Set next client to the new total
+	// 	client_id = client_counter - 1;
+	// 	client->ID = client_id;
+	// 	client->subChannel;
+	// 	client_counter++;
+	// 	client->total = client_counter;
+	// }
+	// if (client_counter == 0 || client_id >= client_counter)
+	// {
+	// 	printf("Case 2\n");
+	// 	// Initialise properties when there is not holes
+	// 	client->ID = client_id;
+	// 	client_id++;
+	// 	client->subChannel;
+	// 	client_counter++;
+	// 	client->total = client_counter;
+	// }
+
+	// Initialise properties when there is not holes
 	client->ID = client_id;
 	client_id++;
 	client->subChannel;
-	client->total++;
+	client_counter++;
+	client->total = client_counter;
 	// return the pointer
 	return client;
 }
 
 void disconnectClient(CLIENT_ID *client)
 {
-	client->total--;
-	// Thinking about ID
+	// // declare pointer for id and counter
+	// int *id, *counter;
+
+	// // Point to the global id and counter
+	// id = &client_id;
+	// counter = &client_counter;
+	// if next current exiting client smaller than total, next client_id will replace with cur client_id
+	// if (cur + 1 < client_counter)
+	// {
+	// 	client_id = cur;
+	// }
+	// else if (cur + 1 == client_counter)
+	// {
+	// 	printf("Case 2\n");
+	// 	client_id = client_counter - 1;
+	// }
+
+	client_counter--;
+	// Reset subbed channel for sure
+	memset(client->subChannel, 0, sizeof(client->subChannel));
 }
 //------------------------------------End of Client ID------------------------------------------------------
 void shutdown_server(int sig)
@@ -263,7 +310,8 @@ void store_message(int sockfd)
 void loop_listen(int new_fd)
 {
 	char buff[MAX] = {0};
-	int n, ch;
+	int n;
+
 	/* repeat: accept, send, close the connection */
 	/* for every accepted connection, use a sepetate process or thread to serve it */
 	while (1)
@@ -275,9 +323,9 @@ void loop_listen(int new_fd)
 			perror("Accepting message");
 			continue;
 		}
-		printf("server: got connection from %s\n",
-			   inet_ntoa(their_addr.sin_addr));
-			   
+		printf("server: got connection from %s:%d\n",
+			   inet_ntoa(their_addr.sin_addr), ntohs(their_addr.sin_port));
+
 		CLIENT_ID *client = createClient();
 		int tmp = htonl(client->ID);
 		send(new_fd, &tmp, sizeof(tmp), 0);
@@ -293,7 +341,7 @@ void loop_listen(int new_fd)
 				{
 					printf("SUB process\n");
 					subscribe(new_fd);
-					bzero(buff, sizeof(buff));					
+					bzero(buff, sizeof(buff));
 				}
 
 				// SEND command
@@ -305,8 +353,10 @@ void loop_listen(int new_fd)
 				}
 				if ((strncmp(buff, "BYE", 3)) == 0)
 				{
-					printf("Disconnected with %s\n", inet_ntoa(their_addr.sin_addr));
+					printf("Disconnected with %s:%d\n", inet_ntoa(their_addr.sin_addr), ntohs(their_addr.sin_port));
 					// Unsubcribe with all subbed channels
+					disconnectClient(client);
+					break;
 					bzero(buff, sizeof(buff));
 				}
 			}
