@@ -26,10 +26,12 @@ struct sockaddr_in my_addr;	/* my address information */
 struct sockaddr_in their_addr; /* connector's address information */
 socklen_t sin_size;
 int channel_id[254] = {0}; // ID=0 Available, 1 = Not available/subbed
-int32_t client_id;		   // new connection +1
+
 pid_t childpid;
 char inbox[1000][254];
 int read_count[256]={0};
+volatile int client_id, client_counter;
+
 //--------------------------------------Queue--------------------------------------------------------------
 typedef struct Queue
 {
@@ -125,21 +127,31 @@ typedef struct
 // Function to create client
 CLIENT_ID *createClient()
 {
+	// // declare pointer for id and counter
+	// int *id, *counter;
+
+	// // Point to the global id and counter
+	// id = &client_id;
+	// counter = &client_counter;
+
 	CLIENT_ID *client;
 	client = (CLIENT_ID *)malloc(sizeof(CLIENT_ID));
-	// Initialise properties
+
+	// Initialise properties when there is not holes
 	client->ID = client_id;
 	client_id++;
 	client->subChannel;
-	client->total++;
+	client_counter++;
+	client->total = client_counter;
 	// return the pointer
 	return client;
 }
 
 void disconnectClient(CLIENT_ID *client)
 {
-	client->total--;
-	// Thinking about ID
+	client_counter--;
+	// Reset subbed channel for sure
+	memset(client->subChannel, 0, sizeof(client->subChannel));
 }
 //------------------------------------End of Client ID------------------------------------------------------
 void shutdown_server(int sig)
@@ -258,15 +270,74 @@ void store_message(int sockfd)
 	}
 	// enqueue message to the inbox queue
 	enqueue(channels[atoi(channel)].Q, message);
-	//channels[atoi(channel)].index ++;
-	
-	// Validating the channelid with the client
-	// for (int i =0; i < sizeof(channel_id); i++){
-	// 	if (channel_id[i] == tmp && channel_id[i] == 1){
-	// 		printf("Matched");
-	// 		counter++;
-	// 	}
-	// }
+	write(sockfd, "Successfully saved message!", 28);
+}
+
+void livefeed(int new_fd, int channel, CLIENT_ID *client)
+{
+	int i = 0;
+	char message[MAX] = {0};
+	int t = htonl(channels[channel].Q->size);
+	// Validation for subscription channels
+	if (client->subChannel[channel] == 0)
+	{
+		t = -1;
+		write(new_fd, &t, sizeof(t));
+	}
+	else
+	{
+		write(new_fd, &t, sizeof(t));
+		printf("LIVEFEED <channelid> loop start\n");
+		while (1)
+		{
+			while (channels[channel].Q->size > 0)
+			{
+				strcpy(message, front(channels[channel].Q));
+				write(new_fd, message, sizeof(message));
+				dequeue(channels[channel].Q);
+				bzero(message, sizeof(message));
+			}
+			if (i == 0)
+			{
+				write(new_fd, "All unread messages have been shown.\nWaiting for new messages..\n", 64);
+				i++;
+			}
+			// listening stage
+			if ((t = read(new_fd, message, sizeof(message))) > 0)
+			{
+				if (strncmp(message, "1", 1) == 0)
+				{
+					break;
+				}
+			}
+		}
+		printf("LIVEFEED <channelid> loop break\n");
+	}
+}
+
+void livefeed_all(int new_fd, CLIENT_ID *client)
+{
+	int sub_channel[CHANNEL_MAX] = {0};
+	char **messages = malloc(sizeof(char *) * 50);
+	// for each sub channel get all the unread message
+	for (int i= 0; i < CHANNEL_MAX; i++)
+	{
+		if(client->subChannel[i] == 1)
+		{
+			sub_channel[i] = 1;
+			for (int j = 0; j < channels[i].Q->size; j++)
+			{
+				messages[j] = (char *)malloc((sizeof channels[i].Q->front) * sizeof(char));
+				strcpy(messages[j], front(channels[i].Q));
+				dequeue(channels[i].Q);
+			}
+			// printf("%d: %s", client->subChannel[i], front(channels[i].Q));
+		}
+	}
+	// Send array with subchannel and its total
+	write(new_fd, sub_channel, sizeof(sub_channel));
+	write(new_fd, messages, sizeof(messages));
+	free(messages);
 }
 
 
@@ -408,7 +479,6 @@ for (int i=0; i<MAX; i++){
 void loop_listen(int new_fd)
 {
 	char buff[MAX] = {0};
-	int n, ch;
 	/* repeat: accept, send, close the connection */
 	/* for every accepted connection, use a sepetate process or thread to serve it */
 	while (1)
@@ -420,8 +490,8 @@ void loop_listen(int new_fd)
 			perror("Accepting message");
 			continue;
 		}
-		printf("server: got connection from %s\n",
-			   inet_ntoa(their_addr.sin_addr));
+		printf("server: got connection from %s:%d\n",
+			   inet_ntoa(their_addr.sin_addr), ntohs(their_addr.sin_port));
 			   
 		CLIENT_ID *client = createClient();
 		int tmp = htonl(client->ID);
@@ -456,6 +526,24 @@ void loop_listen(int new_fd)
 					bzero(buff, sizeof(buff));
 				}
 
+				/* LIVEFEED <channelid> */
+				if (((strncmp(buff, "LIVEFEED", 8)) == 0) && (strncmp(&buff[9], "\0", 1) != 0) && (strncmp(&buff[10], "\0", 1)!=0) && (strncmp(&buff[11], "0", 1) !=0))
+				{
+					printf("LIVEFEED <channelid> process\n");
+					char *channel = (char *)malloc(3);
+					strncpy(channel, buff + 9, 3);
+					livefeed(new_fd, atoi(channel), client);
+					bzero(buff, sizeof(buff));
+					free(channel);
+				}
+
+				/* LIVEFEED */
+				if (((strncmp(buff, "LIVEFEED", 8)) == 0) && (strncmp(&buff[9], "\0", 1) == 0) && (strncmp(&buff[10], "\0", 1)==0) && (strncmp(&buff[11], "\0", 1) ==0))
+				{
+					printf("LIVEFEED process\n");
+					livefeed_all(new_fd, client);
+					bzero(buff, sizeof(buff));
+				}
 
 				if ((strncmp(buff, "NEXT", 4) == 0) && (strncmp(&buff[5], "\0", 1)!=0)&& (strncmp(&buff[6], "\0", 1)!=0) && (strncmp(&buff[7], "\0", 1) !=0)
 )
@@ -464,7 +552,6 @@ void loop_listen(int new_fd)
 					Next(new_fd, client);
 					bzero(buff, sizeof(buff));
 				}
-//(strncmp(buff, "NEXT", 4) == 0) && (strncmp(&buff[5], "\0", 1)==0)&& (strncmp(&buff[6], "\0", 1)==0) && (strncmp(&buff[7], "\0", 1) ==0)
 				if ((strncmp(buff, "NEXT", 4) == 0) && (strncmp(&buff[5], "\0", 1)==0)&& (strncmp(&buff[6], "\0", 1)==0) && (strncmp(&buff[7], "\0", 1) ==0)
 )
 				{
@@ -481,10 +568,13 @@ void loop_listen(int new_fd)
 				}
 				
 
+				/* BYE */
 				if ((strncmp(buff, "BYE", 3)) == 0)
 				{
-					printf("Disconnected with %s\n", inet_ntoa(their_addr.sin_addr));
+					printf("Disconnected with %s:%d\n", inet_ntoa(their_addr.sin_addr), ntohs(their_addr.sin_port));
 					// Unsubcribe with all subbed channels
+					disconnectClient(client);
+					break;
 					bzero(buff, sizeof(buff));
 				}
 			}
