@@ -7,6 +7,9 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
+
 
 #define PORT 12345 /* the port client will be connecting to */
 #define MAX 1000

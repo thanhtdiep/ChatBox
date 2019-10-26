@@ -178,7 +178,7 @@ void subscribe(int sockfd, CLIENT_ID *client)
 	input_id = (int)tmp;
 	bzero(&tmp, sizeof(tmp));
 
-	if (input_id > 0 && input_id < 256)
+	if (input_id >= 0 && input_id < 256)
 	{
 
 		if (client->subChannel[input_id] == 0)
@@ -225,7 +225,7 @@ void unsubscribe(int sockfd, CLIENT_ID *client)
 	bzero(&tmp, sizeof(tmp));
 	
 
-	if (input_id > 0 && input_id < 256)
+	if (input_id >= 0 && input_id < 256)
 	{
 
 		if (client->subChannel[input_id] != 0)
