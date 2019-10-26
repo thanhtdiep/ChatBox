@@ -161,7 +161,7 @@ void subscribe(int sockfd, CLIENT_ID *client)
 	// read the message from client and copy it in buffer
 	read(sockfd, &tmp, sizeof(tmp));
 	// print buffer which contains the client contents
-	printf("Client request channel %d\n", (int)tmp);
+	
 
 	input_id = (int)tmp;
 	bzero(&tmp, sizeof(tmp));
@@ -171,24 +171,19 @@ void subscribe(int sockfd, CLIENT_ID *client)
 
 		if (client->subChannel[input_id] == 0)
 		{
-			//printf("Subscribe to channel %d\n", input_id);
+			
 			bzero(&tmp, sizeof(tmp));
 			tmp = 0;
 			write(sockfd, &tmp, sizeof(tmp));
 			client->subChannel[input_id] = 1;
-			printf("Test status:%d\n", client->subChannel[input_id]);
-//Testing
-		/*	printf("Before:%d\n", channels[input_id].status);
-			channel_id[input_id] = input_id;
-			channels[input_id].status = 1;
-			printf("Test status:%d\n", channels[input_id].status);*/
+			
 		}
 		else
 		{
 			bzero(&tmp, sizeof(tmp));
 			tmp = 1; //Channel already subscribe
 			write(sockfd, &tmp, sizeof(tmp));
-			//printf("Channel already subscribed\n");
+			
 		}
 	}
 	else
@@ -196,7 +191,7 @@ void subscribe(int sockfd, CLIENT_ID *client)
 		bzero(&tmp, sizeof(tmp));
 		tmp = 2; //Error range
 		write(sockfd, &tmp, sizeof(tmp));
-		//printf("Channel range 0 to 255 only\n");
+		
 	}
 }
 
@@ -216,14 +211,14 @@ void unsubscribe(int sockfd, CLIENT_ID *client)
 
 	input_id = (int)tmp;
 	bzero(&tmp, sizeof(tmp));
-	//channel_id[5] = 0;
+	
 
 	if (input_id > 0 && input_id < 256)
 	{
 
 		if (client->subChannel[input_id] != 0)
 		{
-			//printf("unsubscribe to channel %d\n", input_id);
+			
 			bzero(&tmp, sizeof(tmp));
 			tmp = 0;
 			write(sockfd, &tmp, sizeof(tmp));
@@ -235,7 +230,7 @@ void unsubscribe(int sockfd, CLIENT_ID *client)
 			bzero(&tmp, sizeof(tmp));
 			tmp = 1;
 			write(sockfd, &tmp, sizeof(tmp));
-			//printf("Channel already unsubscribed\n");
+		
 		}
 	}
 	else
@@ -243,7 +238,7 @@ void unsubscribe(int sockfd, CLIENT_ID *client)
 		bzero(&tmp, sizeof(tmp));
 		tmp = 2;
 		write(sockfd, &tmp, sizeof(tmp));
-		//printf("Channel range 0 to 255 only\n");
+	
 	}
 }
 
@@ -287,7 +282,7 @@ void Next(int sockfd, CLIENT_ID *client){
 	
 	//Get message from the channel_id
 	request_id = (int)tmp;
-	printf("Request:%d\n", request_id);
+
 
 if (request_id > 0 && request_id < 256)
 {
@@ -298,7 +293,7 @@ if (request_id > 0 && request_id < 256)
 
 	strcpy(message, front(channels[request_id].Q));
 	write(sockfd, message, sizeof(message));
-	printf("Transfer:%s\n", message);
+
 
 	//To remove read messages
 	dequeue(channels[(request_id)].Q);
@@ -314,8 +309,6 @@ if (request_id > 0 && request_id < 256)
 }
 
 else{
-	printf("Invalid channel\n");
-	//pass status
 	tmp = 2;
 	write(sockfd, &tmp, sizeof(tmp));
 }
@@ -354,28 +347,17 @@ for (int i=0; i<MAX; i++){
 	{
 		strcpy(message, front(channels[i].Q));
 		//Pass channel id
-		printf("\nChannel:%d\n", i);
 		tmp = i;
 		write(sockfd, &tmp, sizeof(tmp));
-
 		//Pass message
 		strcpy(message, front(channels[i].Q));
 		write(sockfd, message, sizeof(message));
-		printf("Transfer:%s\n", message);
-
 		dequeue(channels[i].Q);
-		// printf("\nChannel:%d\n", i);
-		// printf("Transfer:%s\n", message);
-		//count2++;
+
 	}
-
-
 
 }
 
-	printf("Count msge:%d\n", (int)count);
-
-	
 	
 }
 
@@ -400,21 +382,15 @@ for (int i=0; i<MAX; i++){
 for (int i=0; i<MAX; i++){
 	if (client->subChannel[i] == 1)
 	{
-		printf("\nChannel:%d\n", i);
+
 		tmp = i;
 		write(sockfd, &tmp, sizeof(tmp));
 
-		printf("Total messages:%d\n", read_count[i]+channels[i].Q->size);
-		
 		tmp = read_count[i]+channels[i].Q->size;
 		write(sockfd, &tmp, sizeof(tmp));
 		
-		printf("Unread messages:%d\n", channels[i].Q->size);
-
 		tmp = channels[i].Q->size;
 		write(sockfd, &tmp, sizeof(tmp));
-
-		printf("Read messages:%d\n", read_count[i]);
 
 		tmp = read_count[i];
 		write(sockfd, &tmp, sizeof(tmp));
@@ -481,14 +457,16 @@ void loop_listen(int new_fd)
 				}
 
 
-				if ((strncmp(buff, "NEXT", 4)) == 0)
+				if ((strncmp(buff, "NEXT", 4) == 0) && (strncmp(&buff[5], "\0", 1)!=0)&& (strncmp(&buff[6], "\0", 1)!=0) && (strncmp(&buff[7], "\0", 1) !=0)
+)
 				{
 					printf("NEXT process\n");
 					Next(new_fd, client);
 					bzero(buff, sizeof(buff));
 				}
 //(strncmp(buff, "NEXT", 4) == 0) && (strncmp(&buff[5], "\0", 1)==0)&& (strncmp(&buff[6], "\0", 1)==0) && (strncmp(&buff[7], "\0", 1) ==0)
-				if ((strncmp(buff, "NXT", 3)) == 0)
+				if ((strncmp(buff, "NEXT", 4) == 0) && (strncmp(&buff[5], "\0", 1)==0)&& (strncmp(&buff[6], "\0", 1)==0) && (strncmp(&buff[7], "\0", 1) ==0)
+)
 				{
 					printf("NXT LIVE process\n");
 					NextLive(new_fd, client);

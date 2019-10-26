@@ -71,7 +71,8 @@ void loop_listen(int new_fd)
 		}
 
 
-		if ((strncmp(buff, "NEXT", 4)) == 0)
+		if ((strncmp(buff, "NEXT", 4) == 0) && (strncmp(&buff[5], "\0", 1)!=0)&& (strncmp(&buff[6], "\0", 1)!=0) && (strncmp(&buff[7], "\0", 1) !=0)
+)
 		{
 			char *channel = (char *)malloc(3);
 			strncpy(channel, buff + 5, 3);
@@ -79,7 +80,8 @@ void loop_listen(int new_fd)
 			Next(new_fd, channel);
 		}
 
-		if ((strncmp(buff, "NXT", 3)) == 0)
+		if ((strncmp(buff, "NEXT", 4) == 0) && (strncmp(&buff[5], "\0", 1)==0)&& (strncmp(&buff[6], "\0", 1)==0) && (strncmp(&buff[7], "\0", 1) ==0)
+)
 		{
 			printf("NXT LIVE process\n");
 			NextLive(new_fd);
@@ -241,8 +243,6 @@ void NextLive(int sockfd)
 	read(sockfd, &tmp, sizeof(tmp));
 	count = (int)tmp;
 
-	printf("Received Count:%d\n", count);
-
 // To read all message passed by server
 	for (int n=0; n<count; n++){
 		read(sockfd, &tmp, sizeof(tmp));
@@ -270,8 +270,6 @@ void channel(int sockfd){
 	read(sockfd, &tmp, sizeof(tmp));
 
 	count = (int)tmp;
-
-	printf("Received Count:%d\n", count);
 
 	for (int n=0; n<count; n++){
 
