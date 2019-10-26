@@ -18,14 +18,14 @@
 #define DEFAULT_PORT 12345 /* the port users will be connecting to */
 #define MAX 1000		   /* message length */
 #define BACKLOG 10		   /* how many pending connections queue will hold */
-#define CHANNEL_MAX 255	/* max number of channels */
+#define CHANNEL_MAX 256	/* max number of channels */
 
 /* Golbal variables */
 int sockfd, new_fd, port;	  /* listen on sock_fd, new connection on new_fd */
 struct sockaddr_in my_addr;	/* my address information */
 struct sockaddr_in their_addr; /* connector's address information */
 socklen_t sin_size;
-int channel_id[254] = {0}; // ID=0 Available, 1 = Not available/subbed
+int channel_id[256] = {0}; // ID=0 Available, 1 = Not available/subbed
 
 pid_t childpid;
 char inbox[1000][254];
