@@ -331,7 +331,7 @@ void NextLive(int sockfd, CLIENT_ID *client){
 
 char message[MAX];
 int count=0;
-int count2=0;
+//int count2=0;
 int32_t tmp;
 
 for (int i=0; i<MAX; i++){
@@ -366,7 +366,7 @@ for (int i=0; i<MAX; i++){
 		dequeue(channels[i].Q);
 		// printf("\nChannel:%d\n", i);
 		// printf("Transfer:%s\n", message);
-		count2++;
+		//count2++;
 	}
 
 
@@ -487,7 +487,7 @@ void loop_listen(int new_fd)
 					Next(new_fd, client);
 					bzero(buff, sizeof(buff));
 				}
-
+//(strncmp(buff, "NEXT", 4) == 0) && (strncmp(&buff[5], "\0", 1)==0)&& (strncmp(&buff[6], "\0", 1)==0) && (strncmp(&buff[7], "\0", 1) ==0)
 				if ((strncmp(buff, "NXT", 3)) == 0)
 				{
 					printf("NXT LIVE process\n");
