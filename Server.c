@@ -16,7 +16,7 @@
 #include <limits.h>
 
 #define DEFAULT_PORT 12345 /* the port users will be connecting to */
-#define MAX 1000		   /* message length */
+#define MAX 1024		   /* message length */
 #define BACKLOG 10		   /* how many pending connections queue will hold */
 #define CHANNEL_MAX 255	/* max number of channels */
 
@@ -27,7 +27,6 @@ struct sockaddr_in their_addr; /* connector's address information */
 socklen_t sin_size;
 int channel_id[254] = {0}; // ID=0 Available, 1 = Not available/subbed
 pid_t childpid;
-char inbox[1000][254];
 volatile int client_id, client_counter;
 
 //--------------------------------------Queue--------------------------------------------------------------
@@ -54,7 +53,7 @@ Queue *createQueue(int maxEntry)
 
 void dequeue(Queue *Q)
 {
-	if (Q->size == 0)
+	if (Q->size != 0)
 	{
 		Q->size--;
 		Q->front++;
@@ -128,26 +127,6 @@ CLIENT_ID *createClient()
 
 	CLIENT_ID *client;
 	client = (CLIENT_ID *)malloc(sizeof(CLIENT_ID));
-	// if next client_id smaller than total number
-	// if (client_id < client_counter - 1)
-	// {
-	// 	// Set next client to the new total
-	// 	client_id = client_counter - 1;
-	// 	client->ID = client_id;
-	// 	client->subChannel;
-	// 	client_counter++;
-	// 	client->total = client_counter;
-	// }
-	// if (client_counter == 0 || client_id >= client_counter)
-	// {
-	// 	printf("Case 2\n");
-	// 	// Initialise properties when there is not holes
-	// 	client->ID = client_id;
-	// 	client_id++;
-	// 	client->subChannel;
-	// 	client_counter++;
-	// 	client->total = client_counter;
-	// }
 
 	// Initialise properties when there is not holes
 	client->ID = client_id;
@@ -161,23 +140,6 @@ CLIENT_ID *createClient()
 
 void disconnectClient(CLIENT_ID *client)
 {
-	// // declare pointer for id and counter
-	// int *id, *counter;
-
-	// // Point to the global id and counter
-	// id = &client_id;
-	// counter = &client_counter;
-	// if next current exiting client smaller than total, next client_id will replace with cur client_id
-	// if (cur + 1 < client_counter)
-	// {
-	// 	client_id = cur;
-	// }
-	// else if (cur + 1 == client_counter)
-	// {
-	// 	printf("Case 2\n");
-	// 	client_id = client_counter - 1;
-	// }
-
 	client_counter--;
 	// Reset subbed channel for sure
 	memset(client->subChannel, 0, sizeof(client->subChannel));
@@ -297,14 +259,75 @@ void store_message(int sockfd)
 	}
 	// enqueue message to the inbox queue
 	enqueue(channels[atoi(channel)].Q, message);
+	// Send back successful message
+	write(sockfd, "Successfully saved message!", 28);
+}
 
-	// Validating the channelid with the client
-	// for (int i =0; i < sizeof(channel_id); i++){
-	// 	if (channel_id[i] == tmp && channel_id[i] == 1){
-	// 		printf("Matched");
-	// 		counter++;
-	// 	}
-	// }
+void livefeed(int new_fd, int channel, CLIENT_ID *client)
+{
+	int i = 0;
+	char message[MAX] = {0};
+	int t = htonl(channels[channel].Q->size);
+	// Validation for subscription channels
+	if (client->subChannel[channel] == 0)
+	{
+		t = -1;
+		write(new_fd, &t, sizeof(t));
+	}
+	else
+	{
+		write(new_fd, &t, sizeof(t));
+		printf("LIVEFEED <channelid> loop start\n");
+		while (1)
+		{
+			while (channels[channel].Q->size > 0)
+			{
+				strcpy(message, front(channels[channel].Q));
+				write(new_fd, message, sizeof(message));
+				dequeue(channels[channel].Q);
+				bzero(message, sizeof(message));
+			}
+			if (i == 0)
+			{
+				write(new_fd, "All unread messages have been shown.\nWaiting for new messages..\n", 64);
+				i++;
+			}
+			// listening stage
+			if ((t = read(new_fd, message, sizeof(message))) > 0)
+			{
+				if (strncmp(message, "1", 1) == 0)
+				{
+					break;
+				}
+			}
+		}
+		printf("LIVEFEED <channelid> loop break\n");
+	}
+}
+
+void livefeed_all(int new_fd, CLIENT_ID *client)
+{
+	int sub_channel[CHANNEL_MAX] = {0};
+	char **messages = malloc(sizeof(char *) * 50);
+	// for each sub channel get all the unread message
+	for (int i= 0; i < CHANNEL_MAX; i++)
+	{
+		if(client->subChannel[i] == 1)
+		{
+			sub_channel[i] = 1;
+			for (int j = 0; j < channels[i].Q->size; j++)
+			{
+				messages[j] = (char *)malloc((sizeof channels[i].Q->front) * sizeof(char));
+				strcpy(messages[j], front(channels[i].Q));
+				dequeue(channels[i].Q);
+			}
+			// printf("%d: %s", client->subChannel[i], front(channels[i].Q));
+		}
+	}
+	// Send array with subchannel and its total
+	write(new_fd, sub_channel, sizeof(sub_channel));
+	write(new_fd, messages, sizeof(messages));
+	free(messages);
 }
 
 void loop_listen(int new_fd)
@@ -337,6 +360,7 @@ void loop_listen(int new_fd)
 				// read the message from client and copy it in buffer
 				read(new_fd, buff, sizeof(buff));
 				// Actions
+				/* SUB */
 				if ((strncmp(buff, "SUB", 3)) == 0)
 				{
 					printf("SUB process\n");
@@ -344,13 +368,34 @@ void loop_listen(int new_fd)
 					bzero(buff, sizeof(buff));
 				}
 
-				// SEND command
+				/* SEND */
 				if ((strncmp(buff, "SEND", 4)) == 0)
 				{
 					printf("SEND process\n");
 					store_message(new_fd);
 					bzero(buff, sizeof(buff));
 				}
+
+				/* LIVEFEED <channelid> */
+				if (((strncmp(buff, "LIVEFEED", 8)) == 0) && (strncmp(&buff[9], "\0", 1) != 0) && (strncmp(&buff[10], "\0", 1)!=0) && (strncmp(&buff[11], "0", 1) !=0))
+				{
+					printf("LIVEFEED <channelid> process\n");
+					char *channel = (char *)malloc(3);
+					strncpy(channel, buff + 9, 3);
+					livefeed(new_fd, atoi(channel), client);
+					bzero(buff, sizeof(buff));
+					free(channel);
+				}
+
+				/* LIVEFEED */
+				if (((strncmp(buff, "LIVEFEED", 8)) == 0) && (strncmp(&buff[9], "\0", 1) == 0) && (strncmp(&buff[10], "\0", 1)==0) && (strncmp(&buff[11], "\0", 1) ==0))
+				{
+					printf("LIVEFEED process\n");
+					livefeed_all(new_fd, client);
+					bzero(buff, sizeof(buff));
+				}
+
+				/* BYE */
 				if ((strncmp(buff, "BYE", 3)) == 0)
 				{
 					printf("Disconnected with %s:%d\n", inet_ntoa(their_addr.sin_addr), ntohs(their_addr.sin_port));

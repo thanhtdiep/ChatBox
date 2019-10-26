@@ -11,9 +11,20 @@
 #define PORT 12345 /* the port client will be connecting to */
 #define MAX 1000
 #define MAXDATASIZE 100 /* max number of bytes we can get at once */
+
+/* Golbal variables */
+int sockfd, numbytes, port;
+int tmp, n;
+struct hostent *he;
+struct sockaddr_in their_addr; /* connector's address information */
+
 int input;
+volatile sig_atomic_t stop;
 void send_message(int sockfd, char *channel, char message[]);
 void subscribe();
+void livefeed(int sockfd, int channel);
+void shutdown_client(int signum);
+void livefeed_all(int sockfd);
 
 void loop_listen(int new_fd)
 {
@@ -23,6 +34,7 @@ void loop_listen(int new_fd)
 	/* for every accepted connection, use a sepetate process or thread to serve it */
 	while (1)
 	{ /* main accept() loop */
+		signal(SIGINT, shutdown_client);
 		bzero(buff, sizeof(buff));
 		n = 0;
 		while ((buff[n++] = getchar()) != '\n')
@@ -47,7 +59,6 @@ void loop_listen(int new_fd)
 			char *channel = (char *)malloc(3);
 			// Send SEND signal to server
 			strncpy(channel, buff + 5, 3);
-			printf("%d\n", atoi(channel));
 			//	Filter message
 			for (i = 0; i < sizeof(buff); i++)
 			{
@@ -55,11 +66,33 @@ void loop_listen(int new_fd)
 			}
 			// Run send commands
 			send_message(new_fd, channel, message);
+			free(channel);
 		}
 
-		if ((strncmp(buff, "TEST", 4)) == 0)
+		/* LIVEFEED <channelid> */
+		if (((strncmp(buff, "LIVEFEED", 8)) == 0) && (strncmp(&buff[9], "\0", 1) != 0) && (strncmp(&buff[10], "\0", 1) != 0) && (strncmp(&buff[11], "\0", 1) != 0))
 		{
-			printf("Testing");
+			printf("%s\n", &buff[9]);
+			printf("%s\n", &buff[10]);
+			printf("%s\n", &buff[11]);
+
+			char *channel = (char *)malloc(3);
+			strncpy(channel, buff + 9, 3);
+			// Handling the message
+			livefeed(new_fd, atoi(channel));
+			bzero(buff, sizeof(buff));
+			free(channel);
+		}
+
+		/* LIVEFEED */
+		if ((strncmp(buff, "LIVEFEED", 8) == 0) && (strncmp(&buff[9], "\0", 1) == 0) && (strncmp(&buff[10], "\0", 1) == 0) && (strncmp(&buff[11], "\0", 1) == 0))
+		{
+			char *channel = (char *)malloc(3);
+			strncpy(channel, buff + 9, 3);
+			// Handling the message
+			livefeed_all(new_fd);
+			bzero(buff, sizeof(buff));
+			free(channel);
 		}
 
 		if ((strncmp(buff, "BYE", 3)) == 0)
@@ -70,12 +103,108 @@ void loop_listen(int new_fd)
 		}
 	}
 }
+void exit_loop(int signum)
+{
+	stop = 1;
+	printf("Exit LIVEFEED <channelid> loop\n");
+}
+
+void shutdown_client(int sig)
+{
+	while (waitpid(-1, NULL, WNOHANG) > 0)
+		; /* clean up child processes */
+	close(sockfd);
+	exit(0);
+}
+
+void livefeed(int sockfd, int channel)
+{
+	char message[MAX] = {0};
+	int t, j;
+	int h = 0;
+	int i = 1;
+	signal(SIGINT, exit_loop); /* exit when ctrl + c is pressed */
+	read(sockfd, &t, sizeof(t));
+	// Receive validation whether client is subbed for the channel
+	if (t == -1)
+	{
+		printf("Server: Not subscrbed to channel %d\n", channel);
+	}
+	else if (t == 0)
+	{
+		printf(""); // Display nothing
+	}
+	else
+	{
+		// Welcome message of LIVEFEED
+		printf("You are now in LIVEFEED <channelid>. Please press CTRL + C to back to menu.\nAll unread messages of channel %d are below:\n", channel);
+		t = ntohl(t);
+		// printf("test T: %d\n", t);
+		while (!stop)
+		{
+			while (t >= i)
+			{
+				if (((j = read(sockfd, message, sizeof(message))) > 0))
+				{
+					printf("%d: %s", channel, message);
+				}
+				i++;
+			}
+			if (h == 0)
+			{
+				read(sockfd, message, sizeof(message));
+				printf("%s\n", message);
+				h++;
+			}
+		}
+		write(sockfd, "1", 1);
+	}
+}
+
+void livefeed_all(int sockfd)
+{
+	int sub_channel[255] = {0};
+	char **messages = malloc(sizeof(char *) * 50);
+	int counter =0;
+	for (int i = 0; i < 2; i++)
+	{
+		read(sockfd, sub_channel, sizeof(sub_channel));
+		read(sockfd, messages, sizeof(messages));
+	}
+	// filtering out the and printf the data
+	for (int i = 0; i < sizeof(sub_channel); i++)
+	{
+		if (sub_channel[i] == 1)
+		{
+			counter++;
+		}
+	}
+	if (counter == 0)
+	{
+		printf("Not subscribed to any channels");
+	}
+	else
+	{
+		printf("This is LIVEFEED. Please press CTRL + C to back to menu.\nAll unread messages of all channels that you subscribed to are below:\n");
+		for (int i = 0; i < sizeof(sub_channel); i++)
+		{
+			if (sub_channel[i] == 1)
+			{
+				counter++;
+				printf("Channel %d\n", i);
+				for (int j =0; j < sizeof(messages); j++)
+				{
+					printf("%d: %s", i, *messages[j]);
+				}
+			}
+		}
+	}
+}
 
 void send_message(int sockfd, char *channel, char message[])
 {
 	// Clean buffer
 	int32_t tmp = 0;
-	int status;
 	tmp = atoi(channel);
 	// Check if input is within the range of channel id
 	if (tmp < 0 || tmp > 255)
@@ -85,9 +214,12 @@ void send_message(int sockfd, char *channel, char message[])
 	else
 	{
 		// Send message to server
-		printf("%s\n", message);
-		if (strlen(message) > 1024 + 4)	printf("Warning: Maximum length of message is 1024. Only 1024 characters will be sent this time \n");
+		if (strlen(message) > 1024 + 4)
+			printf("Warning: Maximum length of message is 1024. Only 1024 characters will be sent this time \n");
 		write(sockfd, message, 1024 + 4);
+		// Reading message just sent
+		read(sockfd, message, 28);
+		printf("Server: %s\n", message);
 	}
 }
 
@@ -162,12 +294,6 @@ void unsubscribe(int sockfd)
 
 int main(int argc, char *argv[])
 {
-	int sockfd, numbytes, port;
-	// char buf[MAXDATASIZE];
-	int tmp,n;
-	struct hostent *he;
-	struct sockaddr_in their_addr; /* connector's address information */
-
 	if (argc < 2)
 	{
 		fprintf(stderr, "usage: client hostname (or zPAddress [portNumber])\n");
