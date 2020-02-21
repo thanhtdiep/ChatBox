@@ -1,7 +1,22 @@
 # Process Management and Distributed Computing (CAB403 Assignment System Programming)
 
-## Description 
-The client and server will be implemented in the C programming language using BSD sockets on the Linux operating system.
+## Description
+The  purpose  of  this service  is  to  manage  a  queue  of  text  messages  to  be  delivered to connected/subscribed connections. All connected clients can add a message and each message is associated with a channel ID. Clients are subscribed to multiple channels and when any of the subscribed channels has a new message, the clients can fetch and see it.
+The client and server implemented in the C programming language using BSD sockets on the Linux operating system.
+
+## Commands
+Server-side
+- ./server 12345
+The server will take only one command line parameter that indicates which port the server is to listen on. If no port number is supplied the default port of 12345 is to be used by the server. The above command will run the server program on port 12345. 
+
+Client-side
+- ./client server_IP_address 12345
+
+- SUB <channelid>
+
+- CHANNELS
+- UNSUB <channelid>
+- NEXT<channelid> 
 
 
 
