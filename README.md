@@ -12,7 +12,7 @@ The server will take only one command line parameter that indicates which port t
 Client-side
 - ./client server_IP_address 12345
 
-- SUB <channelid>
+- SUB <<channelid>>
 
 - CHANNELS
 - UNSUB <channelid>
