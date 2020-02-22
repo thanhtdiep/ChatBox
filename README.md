@@ -5,11 +5,11 @@ The  purpose  of  this service  is  to  manage  a  queue  of  text  messages  to
 The client and server implemented in the C programming language using BSD sockets on the Linux operating system.
 
 ## Commands
-Server-side
+### Server-side
 - ./server 12345
 The server will take only one command line parameter that indicates which port the server is to listen on. If no port number is supplied the default port of 12345 is to be used by the server. The above command will run the server program on port 12345. 
 
-Client-side
+### Client-side
 - ./client server_IP_address 12345
 
 - SUB {channelid}
@@ -21,8 +21,8 @@ Client-side
 - NEXT
 - LIVEFEED
 - SEND {channelid} {message}
-- BYE
-\nCloses the client's connection to the server gracefully. This also effectively unsubscribes the user from all channel on that     server, so if the user reconnects, they will have to resubscribe. The same thing should happen if the client is closed due to   SIGINT command being received outside of LIVEFEED mode.
+#### BYE
+Closes the client's connection to the server gracefully. This also effectively unsubscribes the user from all channel on that     server, so if the user reconnects, they will have to resubscribe. The same thing should happen if the client is closed due to   SIGINT command being received outside of LIVEFEED mode.
 
 
 
