@@ -22,7 +22,7 @@ Client-side
 - LIVEFEED
 - SEND {channelid} {message}
 - BYE
-  CLoses the client's connection to the server gracefully. This also effectively unsubscribes the user from all channel on that     server, so if the user reconnects, they will have to resubscribe. The same thing should happen if the client is closed due to   SIGINT command being received outside of LIVEFEED mode.
+Closes the client's connection to the server gracefully. This also effectively unsubscribes the user from all channel on that     server, so if the user reconnects, they will have to resubscribe. The same thing should happen if the client is closed due to   SIGINT command being received outside of LIVEFEED mode.
 
 
 
