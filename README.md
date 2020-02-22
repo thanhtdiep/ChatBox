@@ -57,8 +57,3 @@ If the channel ID is invalid, a message like “Invalid channel: <channelid>.”
 #### BYE
 Closes the client's connection to the server gracefully. This also effectively unsubscribes the user from all channel on that     server, so if the user reconnects, they will have to resubscribe. The same thing should happen if the client is closed due to   SIGINT command being received outside of LIVEFEED mode.
 
-
-
-Server file: gcc -o Server Server.c –lpthread \n
-Client file: gcc -o Client Client.c
-
